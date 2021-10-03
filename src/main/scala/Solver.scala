@@ -165,6 +165,11 @@ class Solver(
       case SimpleApp("re.comp", Seq(e)) => CompExp(expectRegExp(e))
       case Strings.Regex.AllChar()      => DotExp
       case SimpleQualID("re.all")       => StarExp(DotExp)
+      case Strings.Regex.Parse(SString(s)) =>
+        RegExpParser.parse(s).fold(
+          errMsg => throw new Exception(s"re.parse: Cannot parse `$s': $errMsg"),
+          identity
+        )
       case _                            => throw new Exception(s"Cannot interpret given S-expression as regular expression: $t")
     }
 

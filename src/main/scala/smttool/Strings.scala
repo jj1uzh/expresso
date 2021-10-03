@@ -59,6 +59,11 @@ object Strings {
         case _ => None
       }
     }
+
+    // 独自拡張
+    object Parse extends Operations.Operation1 {
+      val name = "re.parse"
+    }
   }
 
   // 独自拡張

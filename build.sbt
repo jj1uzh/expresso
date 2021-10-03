@@ -7,7 +7,8 @@ scalaVersion := "2.13.3"
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.1.0" % "test",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.3"
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "org.scala-lang.modules" %% "scala-parser-combinators" % "2.1.0"
 )
 
 libraryDependencies += "com.regblanc" %% "scala-smtlib" % "0.2.1-41-gc3f60dd"
