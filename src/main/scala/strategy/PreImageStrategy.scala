@@ -18,7 +18,7 @@ import com.typesafe.scalalogging.Logger
   *  - IdentifiedPA を全体でユニークな ID が割り当てられるようにし，
   *    同じ PA を (同じ PST で) 逆像するときはキャッシュを使う
   */
-class PreImageStrategy(logger: Logger) extends Strategy {
+class PreImageStrategy(implicit logger: Logger) extends Strategy {
   private type PA = IdentifiedPA[Int, Char, Int, String]
   private type PR = ParikhRelation[Int, Char, Int, String]
   private type PST = ParikhSST[Int, Either[Char, Int], Char, Int, Int, String]

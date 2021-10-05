@@ -42,8 +42,9 @@ class VarProvider(tempPrefix: String, userPrefix: String) {
 class Solver(
     val checker: strategy.Strategy,
     print: Boolean = false,
-    logger: Logger = Logger("nop"),
     alphabet: Set[Char] = Set.empty // ADDED to the alphabet of constraints
+)(implicit
+  logger: Logger = Logger("nop"),
 ) {
   type ParikhConstraint = Constraint.ParikhConstraint[String]
 
@@ -260,7 +261,7 @@ class Solver(
         val j = freshTemp()
         (Presburger.Var(j), cs :+ ParikhAssertion(name, ParikhLanguage.IndexOf(w, i, j)))
       case _ =>
-        throw new Exception(s"${t.getPos}: Cannot interpret given S-expression ${t} as int expression")
+        throw new Exception(s"${t.optPos}: Cannot interpret given S-expression ${t} as int expression")
     }
   }
 

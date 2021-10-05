@@ -8,7 +8,7 @@ import com.github.kmn4.expresso.language.Constraint._
 import com.typesafe.scalalogging.Logger
 import collection.mutable.{Map => MMap}
 
-class JSSST2021Strategy(logger: Logger) extends Strategy {
+class JSSST2021Strategy(implicit logger: Logger) extends Strategy {
   private type SolverPSST[C, I] = ParikhSST[Int, Option[C], Option[C], Int, Int, I]
   private type SolverPA[C, I] = ParikhAutomaton[Int, Option[C], Int, I]
 
