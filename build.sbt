@@ -10,6 +10,8 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.2.3"
 )
 
+libraryDependencies += "com.regblanc" %% "scala-smtlib" % "0.2.1-41-gc3f60dd"
+
 scalacOptions ++= Seq(
   "-encoding",
   "utf8",
