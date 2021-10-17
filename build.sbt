@@ -30,8 +30,8 @@ Compile / console / scalacOptions --= Seq(
   "-Xfatal-warnings"
 )
 
-fork in run := true
-fork in Test := true
-cancelable in Global := true
-test in assembly := {}
+run / fork := true
+Test / fork := true
+Global / cancelable := true
+assembly / test := {}
 run / javaOptions += "-Xss8m"
