@@ -44,7 +44,7 @@ class Solver(
     print: Boolean = false,
     alphabet: Set[Char] = Set.empty // ADDED to the alphabet of constraints
 )(implicit
-  logger: Logger = Logger("nop"),
+    logger: Logger = Logger("nop")
 ) {
   type ParikhConstraint = Constraint.ParikhConstraint[String]
 
@@ -166,11 +166,13 @@ class Solver(
       case Strings.Regex.AllChar()      => DotExp
       case SimpleQualID("re.all")       => StarExp(DotExp)
       case Strings.Regex.Parse(SString(s)) =>
-        RegExpParser.parse(s).fold(
-          errMsg => throw new Exception(s"re.parse: Cannot parse `$s': $errMsg"),
-          identity
-        )
-      case _                            => throw new Exception(s"Cannot interpret given S-expression as regular expression: $t")
+        RegExpParser
+          .parse(s)
+          .fold(
+            errMsg => throw new Exception(s"re.parse: Cannot parse `$s': $errMsg"),
+            identity
+          )
+      case _ => throw new Exception(s"Cannot interpret given S-expression as regular expression: $t")
     }
 
   type SolverOption = Unit
@@ -209,7 +211,7 @@ class Solver(
           case SString(w)            => w.map(Left.apply)
           case SNumeral(i) if i == 0 => Seq(Right(None))
           case SNumeral(i) if i > 0  => Seq(Right(Some(i.toInt)))
-          case t                     => throw new Exception(s"${t.getPos}: PCRE Replacement component expected but found: $t")
+          case t => throw new Exception(s"${t.getPos}: PCRE Replacement component expected but found: $t")
         }
       )
     case _ => throw new Exception(s"${t.getPos}: PCRE Replacement expected but found: $t")
@@ -339,12 +341,11 @@ class Solver(
       (Ints.GreaterEquals, Presburger.Ge _)
     )
     def unapply(t: SMTTerm): Option[(Presburger.Formula[String], Seq[ParikhConstraint])] = {
-      val binOpt = binary.find { case (op, _) => op.unapply(t).nonEmpty }.map {
-        case (op, constructor) =>
-          val Some((t1, t2)) = op.unapply(t)
-          val (pt1, cs1) = expectInt(t1)
-          val (pt2, cs2) = expectInt(t2)
-          (constructor(pt1, pt2), cs1 ++ cs2)
+      val binOpt = binary.find { case (op, _) => op.unapply(t).nonEmpty }.map { case (op, constructor) =>
+        val Some((t1, t2)) = op.unapply(t)
+        val (pt1, cs1) = expectInt(t1)
+        val (pt2, cs2) = expectInt(t2)
+        (constructor(pt1, pt2), cs1 ++ cs2)
       }
       if (binOpt.nonEmpty) return Some(binOpt.get)
       t match {
@@ -420,7 +421,7 @@ class Solver(
     case SMTCommands.Assert(assertion)                        => assert(assertion)
     case SMTCommands.CheckSat()                               => checkSat()
     case SMTCommands.GetModel()                               => getModel()
-    case _                                                    => throw new Exception(s"${cmd.getPos}: Unsupported command: ${cmd}")
+    case _ => throw new Exception(s"${cmd.getPos}: Unsupported command: ${cmd}")
   }
 
   private def preprocess(commands: Seq[SMTCommands.Command]): Seq[SMTCommands.Command] = {
@@ -470,7 +471,7 @@ class Solver(
         .collect { case a: AtomicAssignment[String] => a.renameVars(varIdx) }
         .sortBy(_.dependerVars.head)
       val assertions = constraints.collect { case a: ParikhAssertion[String] => a.renameVars(varIdx) }
-      val arithFormula = constraints.collect { case PureIntConstraint(f)     => f }
+      val arithFormula = constraints.collect { case PureIntConstraint(f) => f }
       strategy.Input(
         alphabet,
         stringVars.length,
@@ -482,7 +483,7 @@ class Solver(
 
 }
 
-trait Escape  {
+trait Escape {
   def unescape(w: String): String
 }
 
@@ -505,11 +506,10 @@ object PyExEscape extends Escape {
     ('\\', '\\')
   )
   private val backslashes = backslashesSeq
-    .map {
-      case (target, replacement) =>
-        val t = "\\" + target
-        val r = replacement.toString
-        (w: String) => w.replace(t, r)
+    .map { case (target, replacement) =>
+      val t = "\\" + target
+      val r = replacement.toString
+      (w: String) => w.replace(t, r)
     }
   private val func = (Seq(hexCode) ++ backslashes)
     .reduce[String => String] { case (acc, f) => acc andThen f }
