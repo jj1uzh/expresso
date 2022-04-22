@@ -21,6 +21,8 @@ import smtlib.trees.{Commands => SMTCommands}
 import smtlib.trees.{Terms => SMTTerms}
 import smtlib.trees.TreeTransformer
 import smtlib.trees.Tree
+import com.github.kmn4.expresso.strategy.Input
+import scala.collection.mutable.ArrayBuffer
 
 // 変数にプレフィックスを加えるのは Preprocessor (一時変数の導入をするから).
 // Solver は変数にプレフィックスがついた制約を解き，そのモデルからプレフィックスをはずして出力する．
@@ -42,7 +44,8 @@ class VarProvider(tempPrefix: String, userPrefix: String) {
 class Solver(
     val checker: strategy.Strategy,
     print: Boolean = false,
-    alphabet: Set[Char] = Set.empty // ADDED to the alphabet of constraints
+  alphabet: Set[Char] = Set.empty, // ADDED to the alphabet of constraints
+  checkerGen: () => strategy.Strategy = () => ???
 )(implicit
     logger: Logger = Logger("nop")
 ) {
@@ -51,7 +54,7 @@ class Solver(
   def setLogic(logic: SMTCommands.Logic): Unit = ()
 
   // temp_*, user_*
-  private val provider = new VarProvider("t", "u")
+  private val provider = new VarProvider("t", "u_")
   val freshTemp = () => provider.freshTemp()
 
   var env = Map.empty[String, Sort]
@@ -67,7 +70,7 @@ class Solver(
         userIntVars += s
         env += (s -> sort)
       case Strings.StringSort() => env += (s -> sort)
-      case _                    => throw new Exception(s"${sort.getPos}: Unsupported sort: ${sort}")
+      case _                    => throw new Exception(s"${sort.optPos}: Unsupported sort: ${sort}")
     }
   }
 
@@ -91,17 +94,27 @@ class Solver(
     res
   }
 
-  private[expresso] def checkSat(): Unit = transform(constraints, alphabet) match {
-    case Some(input) =>
+  var restChekers: ArrayBuffer[strategy.Strategy] = ArrayBuffer()
+  def checkers = checker +: restChekers
+  private[expresso] def checkSat(): Boolean = transform(constraints, alphabet) match {
+    case Some(input @ Input(_, _, _, _, _, Nil)) =>
       val sat = withLogging("checkSat()")(checker.checkSat(input))
-      if (sat) printLine("sat")
-      else printLine("unsat")
+      printLine(if (sat) "sat" else "unsat")
+      sat
+    case Some(input @ Input(alphabet, strVarNum, assigns, assertions, formulae, Seq(disj))) =>
+      println(s"DEBUG: disjunction: ${disj}")
+      val newChecker = checkerGen()
+      restChekers.addOne(newChecker)
+      val sat1 = checker.checkSat(Input(alphabet, strVarNum, assigns, assertions :+ disj.passertion, formulae, Nil))
+      val sat2 = newChecker.checkSat(Input(alphabet, strVarNum, assigns, assertions, formulae :+ disj.intc.formula, Nil))
+      sat1 || sat2
     case None =>
-      printLine("unknown  ; input is not straight-line")
+      throw new Exception("unknown  ; input is not straight-line")
   }
 
   private[expresso] def getModel(): Option[(Map[String, String], Map[String, Int])] = {
-    withLogging("getModel()")(checker.getModel() zip sortStringVars(constraints)) match {
+    //    withLogging("getModel()")(checker.getModel() zip sortStringVars(constraints)) match {
+    withLogging("getModel()")(checkers.view.filter(_.issat).map(_.getModel()).head zip sortStringVars(constraints)) match {
       case Some(((ss, im), stringVars)) =>
         val sm = ss.zipWithIndex.map { case (value, idx) => stringVars(idx) -> value }.toMap
         val sModel =
@@ -116,6 +129,12 @@ class Solver(
         None
     }
   }
+
+  private[expresso] def checkSatForall(v: String): Boolean =
+    transform(constraints, alphabet) match {
+      case Some(input) => checker.checkSatForall(v, input)
+      case None        => throw new Exception("Not straight-line")
+    }
 
   // TODO expectConstraint を TreeTransformer で書き直す
   // (assert t) の t を受け取って ParikhConstraint の Seq を返す.
@@ -260,9 +279,10 @@ class Solver(
         val newVar = freshTemp()
         val constr = ParikhAssertion(name, ParikhLanguage.IndexOfConst(w, c.toInt, newVar))
         (Presburger.Var(newVar), Seq(constr))
-      case Ints.Mul(SNumeral(c), t) =>
-        val (pt, cs) = expectInt(t)
-        (Presburger.Mult(Presburger.Const(c.toInt), pt), cs)
+      case Ints.Mul(c, t) =>
+        val (pt1, cs1) = expectInt(c)
+        val (pt2, cs2) = expectInt(t)
+        (Presburger.Mult(pt1, pt2), cs1 ++ cs2)
       case Strings.IndexOf(SimpleQualID(name), SString(w), t) =>
         val (i, cs) = parseAndAbstract(t)
         val j = freshTemp()
@@ -327,6 +347,48 @@ class Solver(
       }
   }
 
+  // object DisjunctionAssertion {
+  //   val binaries = Seq[
+  //     (
+  //         smtlib.theories.Operations.Operation2,
+  //         (Presburger.Term[String], Presburger.Term[String]) => Presburger.Formula[String]
+  //     )
+  //   ](
+  //     (CoreTheory.Equals, Presburger.Eq.apply[String] _),
+  //     (Ints.LessThan, Presburger.Lt.apply[String] _),
+  //     (Ints.LessEquals, Presburger.Le.apply[String] _),
+  //     (Ints.GreaterThan, Presburger.Gt _),
+  //     (Ints.GreaterEquals, Presburger.Ge _)
+  //   )
+  //   def unapply(term: SMTTerm): Option[(ParikhConstraint, Seq[ParikhConstraint])] = {
+  //     object Binary {
+  //       def unapply(t: SMTTerm) =
+  //         binaries.find { case (op, _) => op.unapply(t).nonEmpty }.map { case (op, constructor) =>
+  //           val Some((t1, t2)) = op.unapply(t)
+  //           val (pt1, cs1) = expectInt(t1)
+  //           val (pt2, cs2) = expectInt(t2)
+  //           (constructor(pt1, pt2), cs1 ++ cs2)
+  //         }
+  //     }
+  //     term match {
+  //       case CoreTheory.Or(Strings.InRegex(SimpleQualID(name), regexTerm), Binary(c, cs)) =>
+  //         val re = expectRegExp(regexTerm)
+  //         require(cs.isEmpty)
+  //         Some(
+  //           (
+  //             DisjunctionConstraint(
+  //               ParikhAssertion(name, ParikhLanguage.FromRegExp(re)),
+  //               PureIntConstraint(c)
+  //             ),
+  //             Seq()
+  //           )
+  //         )
+  //       case _ =>
+  //         None
+  //     }
+  //   }
+  // }
+
   object IntConstraint {
     val binary = Seq[
       (
@@ -390,7 +452,7 @@ class Solver(
   // _1 is t, and _2 is int equations and / or Parick assertions (for length).
   def expectConstraint(t: SMTTerm): (ParikhConstraint, Seq[ParikhConstraint]) = t match {
     // If (= x t) and x is string variable then t is transduction
-    case CoreTheory.Equals(SimpleQualID(name), t) if env(name) == Strings.StringSort() =>
+    case CoreTheory.Equals(SimpleQualID(name), t) if env.get(name).contains(Strings.StringSort()) =>
       t match {
         case SimpleTransduction(rhsStringVar, trans) =>
           (ParikhAssignment(name, trans, rhsStringVar), Seq.empty)
@@ -408,9 +470,33 @@ class Solver(
       }
     // Other equalities are between ints.
     case IntConstraint(f, cs) => (f, cs)
+
     case Strings.InRegex(SimpleQualID(name), t) =>
       val re = expectRegExp(t)
       (ParikhAssertion(name, ParikhLanguage.FromRegExp(re)), Seq.empty)
+    case CoreTheory.Not(Strings.InRegex(SimpleQualID(name), t)) =>
+      val re = expectRegExp(t)
+      (ParikhAssertion(name, ParikhLanguage.FromRegExp(RegExp.CompExp(re))), Seq.empty)
+
+    case CoreTheory.And(t1, t2) =>
+      val (c1, cs1) = expectConstraint(t1)
+      val (c2, cs2) = expectConstraint(t2)
+      (c1, cs1 ++ Seq(c2) ++ cs2)
+
+    case CoreTheory.Or(Strings.InRegex(SimpleQualID(name), t), IntConstraint(f, cs)) =>
+      val re = expectRegExp(t)
+      (DisjunctionConstraint(ParikhAssertion(name, ParikhLanguage.FromRegExp(re)), PureIntConstraint(f)), cs)
+
+    case CoreTheory.Or(CoreTheory.Not(Strings.InRegex(SimpleQualID(name), t)), IntConstraint(f, cs)) =>
+      val re = expectRegExp(t)
+      (DisjunctionConstraint(ParikhAssertion(name, ParikhLanguage.FromRegExp(RegExp.CompExp(re))), PureIntConstraint(f)), cs)
+
+    case CoreTheory.Not(CoreTheory.And(t1, t2)) =>
+      expectConstraint(CoreTheory.Or(CoreTheory.Not(t1), CoreTheory.Not(t2)))
+
+    case CoreTheory.Not(CoreTheory.Or(t1, t2)) =>
+      expectConstraint(CoreTheory.And(CoreTheory.Not(t1), CoreTheory.Not(t2)))
+
     case _ => throw new Exception(s"${if (t.hasPos) t.getPos else -1}: Unsupported assertion: ${t}")
   }
 
@@ -432,6 +518,7 @@ class Solver(
 
   def executeScript(script: SMTCommands.Script): Unit = {
     val cmds = preprocess(script.commands)
+    println(cmds)
     cmds.foreach(c => logger.trace(c.toString))
     cmds.foreach(execute)
   }
@@ -458,8 +545,8 @@ class Solver(
   }
 
   private def transform(
-      constraints: Seq[ParikhConstraint],
-      additionalAlphabet: Set[Char]
+    constraints: Seq[ParikhConstraint],
+    additionalAlphabet: Set[Char]
   ): Option[strategy.Input] = // SL でなければ None
     sortStringVars(constraints) map { stringVars =>
       val varIdx = stringVars.zipWithIndex.toMap
@@ -472,12 +559,14 @@ class Solver(
         .sortBy(_.dependerVars.head)
       val assertions = constraints.collect { case a: ParikhAssertion[String] => a.renameVars(varIdx) }
       val arithFormula = constraints.collect { case PureIntConstraint(f) => f }
+      val disjs = constraints.collect { case d @ DisjunctionConstraint(_, _) => d.renameVars(varIdx) }
       strategy.Input(
         alphabet,
         stringVars.length,
         assignments,
         assertions,
-        arithFormula
+        arithFormula,
+        disjs
       )
     }
 

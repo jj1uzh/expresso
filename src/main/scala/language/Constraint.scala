@@ -55,8 +55,11 @@ object Constraint {
     override def usedAlphabet: Set[Char] = Set.empty
   }
 
+  sealed trait RegIntConstraint[S] extends ParikhConstraint[S]
+
   case class ParikhAssertion[S](stringVar: S, lang: ParikhLanguage[Char, String])
-      extends ParikhConstraint[S] {
+      extends ParikhConstraint[S]
+      with RegIntConstraint[S] {
 
     override def dependerVars: Seq[S] = Seq.empty
 
@@ -67,7 +70,9 @@ object Constraint {
     override def renameVars[T](f: S => T): ParikhAssertion[T] = copy(stringVar = f(stringVar))
   }
   // type PureIntConstraint = Presburger.Formula[String]
-  case class PureIntConstraint[S](val formula: Presburger.Formula[String]) extends ParikhConstraint[S] {
+  case class PureIntConstraint[S](val formula: Presburger.Formula[String])
+      extends ParikhConstraint[S]
+      with RegIntConstraint[S] {
 
     override def dependerVars: Seq[S] = Seq.empty
 
@@ -77,5 +82,14 @@ object Constraint {
 
     override def renameVars[T](f: S => T): PureIntConstraint[T] =
       new PureIntConstraint(formula)
+  }
+
+  case class DisjunctionConstraint[S](passertion: ParikhAssertion[S], intc: PureIntConstraint[S])
+      extends ParikhConstraint[S] {
+    override def usedAlphabet: Set[Char] = passertion.usedAlphabet ++ intc.usedAlphabet
+    override def dependerVars: Seq[S] = passertion.dependerVars ++ intc.dependerVars
+    override def dependeeVars: Seq[S] = passertion.dependeeVars ++ intc.dependeeVars
+    override def renameVars[T](f: S => T): DisjunctionConstraint[T] =
+      DisjunctionConstraint(passertion.renameVars(f), intc.renameVars(f))
   }
 }

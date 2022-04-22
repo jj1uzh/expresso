@@ -16,8 +16,11 @@ object Monoid {
   }
   implicit def vectorMonoid[K, V: Monoid](ks: Iterable[K]): Monoid[Map[K, V]] = new Monoid[Map[K, V]] {
     val unit = ks.map(_ -> Monoid[V].unit).toMap
-    def combine(v1: Map[K, V], v2: Map[K, V]) =
-      ks.map(k => k -> Monoid[V].combine(v1(k), v2(k))).toMap
+    def combine(v1: Map[K, V], v2: Map[K, V]) = {
+      //      ks.map(k => k -> Monoid[V].combine(v1(k), v2(k))).toMap
+      val m = ks.map(k => k -> Monoid[V].combine(v1.getOrElse(k, Monoid[V].unit), v2.getOrElse(k, Monoid[V].unit))).toMap
+      m
+    }
   }
   implicit val intAdditiveMonoid: Monoid[Int] = new Monoid[Int] {
     def unit = 0

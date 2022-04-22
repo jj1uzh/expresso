@@ -2,6 +2,10 @@ package com.github.kmn4
 
 import com.github.kmn4.expresso.math.{Cop, Cop1, Cop2, Monoid}
 import scala.collection.immutable.Queue
+import smtlib.trees.Commands
+import smtlib.trees.Terms
+import smtlib.printer.PrintingContext
+import smtlib.trees.TreeTransformer
 
 package object expresso {
 
@@ -199,4 +203,23 @@ package object expresso {
     def apply[T](f: => T) = new Cacher(f)
   }
 
+  /** 重複しない新しい要素を生成 */
+  trait Gen[T] {
+    def gen(elms: Iterable[T]): T
+  }
+
+  implicit object GenInt extends Gen[Int] {
+    def gen(elms: Iterable[Int]): Int =
+      if (elms.isEmpty) 0 else elms.max + 1
+  }
+
+  // case class NonRegAssertNotCmd(terms: Seq[Terms.Term]) extends Commands.CommandExtension {
+  //   override def print(ctx: PrintingContext): Unit = {
+  //     ctx.print(s"(nonreg/assert-not ${terms.mkString("\n", "\n", "")})")
+  //   }
+  //   override def transform(tt: TreeTransformer)(context: tt.C): (Commands.Command, tt.R) = {
+  //     val (rts, rcs) = terms.map { tt.transform(_, context) }.unzip
+  //     (NonRegAssertNotCmd(rts), tt.combine(this, context, rcs))
+  //   }
+  // }
 }

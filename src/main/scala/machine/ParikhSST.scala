@@ -554,6 +554,30 @@ case class ParikhSST[Q, A, B, X, L, I](
     }
   }
 
+  def isSatForall(v: String): Boolean = {
+    val formulas = {
+      acceptFormulas.map(_.renameVars {
+        case Left(i)  => s"int_$i"
+        case Right(l) => s"log_$l"
+      }) :+ parikhImageFormula.renameVars {
+        case Left(i)  => s"bound_$i"
+        case Right(l) => s"log_$l"
+      }
+    }
+    withZ3Context { (ctx) =>
+      val solver = ctx.mkSolver("LIA")
+      val z3Exprs = formulas.map(Presburger.Formula.formulaToZ3Expr(ctx, Map.empty[String, z3.IntExpr], _))
+      val freevars = formulas.map(_.freeVars.toSet).reduce(_ ++ _) - s"int_$v"
+      val existsExpr = ctx.mkExists(freevars.toArray.map(ctx.mkIntConst), ctx.mkAnd(z3Exprs:_*), 0, null, null, null, null)
+      val impliesExpr = ctx.mkImplies(ctx.mkGe(ctx.mkIntConst(s"int_$v"), ctx.mkInt(1)), existsExpr)
+      val forallExpr = ctx.mkForall(Array(ctx.mkIntConst(s"int_$v")), impliesExpr, 0, null, null, null, null)
+//      println(forallExpr)
+      solver.add(forallExpr)
+      val result = solver.check()
+      result == z3.Status.SATISFIABLE
+    }
+  }
+
   /** Returns (w, w') such that this transduces w to (w', v). */
   def inputOutputFor(v: Map[L, Int]): (Seq[A], Seq[B]) = {
     val enft = toLogVectorEpsNFT

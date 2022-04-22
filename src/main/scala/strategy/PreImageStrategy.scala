@@ -49,7 +49,7 @@ class PreImageStrategy(implicit logger: Logger) extends Strategy {
       val pa = pas.head.pa
       pa.states.size
     }
-    logger.info(s"intersect done\t$sizes")
+//    logger.info(s"intersect done\t$sizes")
     val psts: Seq[ParikhSST[Int, Char, Char, Unit, (Int /* index */, Int /* l */ ), String]] =
       uniqPR.parikhAutomata.zipWithIndex.map {
         case (Seq(IdentifiedPA(_, pa)), idx) => pa.toIdentityParikhSST.renamed(identity _, identity _, l => (idx, l))
@@ -73,6 +73,7 @@ class PreImageStrategy(implicit logger: Logger) extends Strategy {
     withZ3Context { ctx =>
       val solver = ctx.mkSolver()
       val z3Expr = Presburger.Formula.formulaToZ3Expr(ctx, Map.empty[String, z3.IntExpr], formula)
+//      println(s"Z3 Expression: $z3Expr")
       solver.add(z3Expr)
       logger.debug("check start")
       val status = WithTime("check")(solver.check())
@@ -130,6 +131,12 @@ class PreImageStrategy(implicit logger: Logger) extends Strategy {
     }
     WithTime.info
     models.nonEmpty
+  }
+
+  override def issat: Boolean = models.nonEmpty
+  override def checkSatForall(v: String, constraint: Input): Boolean = {
+    println("Preimage strategy: forall is not implemented. Returns true.")
+    true
   }
 
   override def getModel(): Output = models

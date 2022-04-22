@@ -200,7 +200,7 @@ class Preprocessor(provider: VarProvider) {
   // なので，ユーザ変数とその代表元のペア全体もプリプロセス結果に含める必要がある.
   // Solver はこれを使って全てのユーザ変数を出力する．
   def preprocess(argCommands: Seq[Commands.Command]): (
-      Seq[Commands.Command],
+    Seq[Commands.Command],
       // 全てのユーザ変数からその置き換え先へのマップ (置き換えてないなら自分)
       Map[String, String]
   ) = {
@@ -215,7 +215,7 @@ class Preprocessor(provider: VarProvider) {
     }
 
     // ユーザー宣言変数にプレフィックスを加える
-    commands = {
+    {
       val vars = SortStore(commands: _*).map.keySet
       val f: PartialFunction[Terms.Term, Terms.Term] = {
         case SimpleQualID(x) if vars(x) => SimpleQualID(provider.UserVar(x))
@@ -229,7 +229,7 @@ class Preprocessor(provider: VarProvider) {
           (newSym, combine(symbol, context, Seq()))
         }
       }
-      commands.map(prefixer.transform(_, ())).map(_._1)
+      commands = commands.map(prefixer.transform(_, ())).map(_._1)
     }
 
     // - (= (ite b 0 1) 0) のような式を b などに置き換える
@@ -277,7 +277,8 @@ class Preprocessor(provider: VarProvider) {
       val sortsMap = sorts.map
       val string = Strings.StringSort()
 
-      { case SimpleQualID(name) if sortsMap(name) == string => name }
+//      { case SimpleQualID(name) if sortsMap(name) == string => name }
+      { case SimpleQualID(name) if sortsMap.get(name).contains(string)  => name }
     }
     // 1., 2.
     for (Core.Equals(StringVariable(x), StringVariable(y)) <- literals) {

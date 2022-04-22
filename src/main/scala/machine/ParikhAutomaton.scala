@@ -2,6 +2,7 @@ package com.github.kmn4.expresso.machine
 
 import com.github.kmn4.expresso.math.{Cop, Cop1, Cop2, Presburger}
 import com.github.kmn4.expresso.{graphToMap, searchStates}
+import com.github.kmn4.expresso.Gen
 
 case class ParikhAutomaton[Q, A, L, I](
     states: Set[Q],
@@ -16,7 +17,7 @@ case class ParikhAutomaton[Q, A, L, I](
 
   lazy val sizes = (states.size, edges.size)
 
-  val trans = graphToMap(edges) { case (q, a, v, r)         => (q, a) -> (r, v) }
+  val trans = graphToMap(edges) { case (q, a, v, r) => (q, a) -> (r, v) }
   val acceptFunc = graphToMap(acceptRelation) { case (q, v) => q -> v }
 
   lazy val acceptF = graphToMap(acceptRelation)(identity)
@@ -65,9 +66,44 @@ case class ParikhAutomaton[Q, A, L, I](
     )
   }
 
-  /** Returns a pair (n, v) of I vector and L vector that meets the following if exists:
-    * there exists w for which this outputs v and formula(n, v) == true. */
+  /** complementを生成 (Klaedtke,Rueß 2002 Appendix A.1 Theorem 25) */
+  def complement[R, K](implicit qgen: Gen[Q], lgen: Gen[L]): ParikhAutomaton[Q, A, L, I] = {
+    val inLabel = lgen.gen(ls) // ○→◎
+    val outLabel = lgen.gen(ls + inLabel) // ◎→○
+    val accStates = acceptRelation.map { case (state, _) => state }
+    val newEdges =
+      edges.map {
+        case (fromState, alphabet, update, toState)
+            if !(accStates contains fromState) & (accStates contains toState) =>
+          (fromState, alphabet, update + (inLabel -> 1), toState)
+        case (fromState, alphabet, update, toState)
+            if (accStates contains fromState) & !(accStates contains toState) =>
+          (fromState, alphabet, update + (outLabel -> 1), toState)
+        case other => other
+      }
+    import Presburger.{Formula, Conj, Disj, Not, Eq, Var}
+    val condIfNotInAccState: Formula[Either[I, L]] =
+      if (accStates contains q0) Not(Eq(Var(Right(inLabel)), Var(Right(outLabel))))
+      else Eq(Var(Right(inLabel)), Var(Right(outLabel)))
+    ParikhAutomaton(
+      states,
+      inSet,
+      ls + inLabel + outLabel,
+      is,
+      newEdges,
+      q0,
+      //      (states -- accStates).map(_ -> Map.empty[L, Int]), // TODO:OK?
+      acceptRelation ++ (states -- accStates).map(_ -> (ls + inLabel + outLabel).map(_ -> 0).toMap),
+      Seq(Disj(Seq(Not(Conj(acceptFormulas.distinct)), condIfNotInAccState)))
+    )
+  }
+
+  /** Returns a pair (n, v) of I vector and L vector that meets the following if exists: there exists w for
+    * which this outputs v and formula(n, v) == true.
+    */
   def ilVectorOption: Option[(Map[I, Int], Map[L, Int])] = toParikhSST.ilVectorOption
+
+  def isSatForall(v: String): Boolean = toParikhSST.isSatForall(v)
 
   def renamed: ParikhAutomaton[Int, A, Int, I] = {
     val qMap = states.zipWithIndex.toMap

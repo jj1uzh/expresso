@@ -7,11 +7,11 @@ object Presburger {
   /** Types and constructers for Presburger formula */
   sealed trait Term[X] {
     def eval(valuation: Map[X, Int]): Int = this match {
-      case Const(i)          => i
-      case Var(x)            => valuation(x)
-      case Add(ts)           => ts.map(_.eval(valuation)).sum
-      case Sub(t1, t2)       => t1.eval(valuation) - t2.eval(valuation)
-      case Mult(Const(i), t) => i * t.eval(valuation)
+      case Const(i)    => i
+      case Var(x)      => valuation(x)
+      case Add(ts)     => ts.map(_.eval(valuation)).sum
+      case Sub(t1, t2) => t1.eval(valuation) - t2.eval(valuation)
+      case Mult(i, t)  => i.eval(valuation) * t.eval(valuation)
     }
 
     def freeVars: Set[X] = this match {
@@ -31,7 +31,8 @@ object Presburger {
   case class Var[X](x: X) extends Term[X]
   case class Add[X](ts: Seq[Term[X]]) extends Term[X]
   case class Sub[X](t1: Term[X], t2: Term[X]) extends Term[X]
-  case class Mult[X](c: Const[X], t: Term[X]) extends Term[X]
+  // Mult は当初定数倍を意図していたが，その後の変更で任意の掛け算として使われるようになった．
+  case class Mult[X](c: Term[X], t: Term[X]) extends Term[X]
   sealed trait Formula[X] {
     def smtlib: String = Formula.formulaToSMTLIB(this)
 
@@ -118,6 +119,7 @@ object Presburger {
           case Add(ts)           => Add(ts.map(aux))
           case Sub(t1, t2)       => Sub(aux(t1), aux(t2))
           case Mult(Const(i), t) => Mult(Const(i), aux(t))
+          case Mult(i, t)        => Mult(aux(i), aux(t))
         }
         aux(t)
       }
@@ -151,7 +153,7 @@ object Presburger {
       substituteBound(f) {
         case Left(b)     => Var(Left(b): Either[B, N])
         case Right(free) => subst(free)
-      } { case Left(b) => Left(b) : Either[B, N] }
+      } { case Left(b) => Left(b): Either[B, N] }
 
     }
     // NOTE renamer should be injective
@@ -163,6 +165,7 @@ object Presburger {
           case Add(ts)           => Add(ts.map(aux))
           case Sub(t1, t2)       => Sub(aux(t1), aux(t2))
           case Mult(Const(i), t) => Mult(Const(i), aux(t))
+          case Mult(i, t)        => Mult(aux(i), aux(t))
         }
         aux(t)
       }
@@ -237,6 +240,17 @@ object Presburger {
         }
       }
       fromFormula(f)
+    }
+
+    def formulaToZ3ForallExpr[X](
+        ctx: z3.Context,
+        freeVars: Map[X, z3.IntExpr],
+        quantifiedVs: Seq[Var[X]],
+        f: Formula[X]
+    ): z3.BoolExpr = {
+      val quantifiedVars = quantifiedVs.map { case Var(x) => x -> ctx.mkIntConst(x.toString) }
+      val body = formulaToZ3Expr(ctx, freeVars ++ quantifiedVars.toMap, f)
+      ctx.mkForall(quantifiedVars.map(_._2).toArray, body, 0, null, null, null, null)
     }
   }
 

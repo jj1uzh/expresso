@@ -11,6 +11,13 @@ sealed trait ParikhLanguage[C, I] {
 }
 
 object ParikhLanguage {
+
+  case class Disjunction[C, I](lang1: ParikhLanguage[C, I], lang2: ParikhLanguage[C, I]) extends ParikhLanguage[C, I] {
+    override def usedAlphabet: Set[C] = lang1.usedAlphabet ++ lang2.usedAlphabet
+    override def toParikhAutomaton(alphabet: Set[C]): ParikhAutomaton[Int,C,Int,I] =
+      lang1.toParikhAutomaton(alphabet)
+  }
+
   case class FromRegExp[C, I](val re: RegExp[C]) extends ParikhLanguage[C, I] {
 
     def usedAlphabet: Set[C] = re.usedAlphabet
@@ -18,6 +25,7 @@ object ParikhLanguage {
     def toParikhAutomaton(alphabet: Set[C]): ParikhAutomaton[Int, C, Int, I] =
       re.toNFA(alphabet).toDFA.toParikhAutomaton.renamed
   }
+
   case class Length[A, I](lenVar: I) extends ParikhLanguage[A, I] {
     def usedAlphabet: Set[A] = Set.empty
 
@@ -148,7 +156,9 @@ object ParikhLanguage {
       val fromSkipState = {
         val trans = graphToMap(edges) { case (q, a, v, r) => (q, a) -> (r, v) }
         alphabet.flatMap { a =>
-          trans(dfa.q0, a).map { case (r, v) => (skipState, a, v + (2 -> 0), r) } +
+          trans(dfa.q0, a).map { case (r, v) =>
+            (skipState, a, v + (2 -> 0), r)
+          } +
             ((skipState, a, Map(0 -> 1, 1 -> 1, 2 -> 1), skipState))
         }
       }
