@@ -7,6 +7,7 @@ import com.github.kmn4.expresso.language._
 import com.github.kmn4.expresso.language.Constraint._
 import com.typesafe.scalalogging.Logger
 import collection.mutable.{Map => MMap}
+import com.typesafe.scalalogging.StrictLogging
 
 class JSSST2021Strategy(implicit logger: Logger) extends Strategy {
   private type SolverPSST[C, I] = ParikhSST[Int, Option[C], Option[C], Int, Int, I]
@@ -353,4 +354,8 @@ class JSSST2021Strategy(implicit logger: Logger) extends Strategy {
     val universalPA = ParikhAutomaton.universal[Int, Char, Int, String](0, alphabet)
     solverPA((0 to lastVarIdx).map(idxPA.getOrElse(_, universalPA)), 0).renamed
   }
+}
+
+object JSSST2021Strategy extends StrategyFactory[JSSST2021Strategy] with StrictLogging {
+  def mkStrategy: JSSST2021Strategy = new JSSST2021Strategy(logger)
 }

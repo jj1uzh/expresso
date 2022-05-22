@@ -7,6 +7,7 @@ import com.github.kmn4.expresso.machine._
 import com.github.kmn4.expresso.language.Constraint._
 import Transduction._
 import com.typesafe.scalalogging.Logger
+import com.typesafe.scalalogging.StrictLogging
 
 /**
   * 逆像計算に基づくアルゴリズム．
@@ -363,4 +364,8 @@ class PreImageStrategy(implicit logger: Logger) extends Strategy {
     }
   }
 
+}
+
+object PreImageStrategy extends StrategyFactory[PreImageStrategy] with StrictLogging {
+  def mkStrategy: PreImageStrategy = new PreImageStrategy(logger)
 }

@@ -13,3 +13,7 @@ trait Strategy {
 
   def checkSatForall(v: String, constraint: Input): Boolean
 }
+
+trait StrategyFactory[+T <: Strategy] {
+  def mkStrategy: T
+}
