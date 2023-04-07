@@ -16,7 +16,7 @@ import scala.io.Source
 // - 1 : solving strategy, either 'preimage' or 'jssst' (defaults to 'jssst')
 object Main extends App {
   val appname = "expresso"
-  def usage: String = s"Usage: expresso CONSTRAINT_FILE {preimage | jssst}"
+  def usage: String = s"Usage: expresso [--nonreg] CONSTRAINT_FILE {preimage | jssst}"
   val margs = args.toBuffer
   val mode = margs.indexOf("--nonreg") match {
     case i if i >= 0 => margs.remove(i); "nonreg"
