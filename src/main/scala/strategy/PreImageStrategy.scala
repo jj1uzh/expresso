@@ -367,5 +367,5 @@ class PreImageStrategy(implicit logger: Logger) extends Strategy {
 }
 
 object PreImageStrategy extends StrategyFactory[PreImageStrategy] with StrictLogging {
-  def mkStrategy: PreImageStrategy = new PreImageStrategy(logger)
+  def mkStrategy: PreImageStrategy = new PreImageStrategy()(logger)
 }

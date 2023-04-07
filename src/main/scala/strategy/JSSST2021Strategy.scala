@@ -357,5 +357,5 @@ class JSSST2021Strategy(implicit logger: Logger) extends Strategy {
 }
 
 object JSSST2021Strategy extends StrategyFactory[JSSST2021Strategy] with StrictLogging {
-  def mkStrategy: JSSST2021Strategy = new JSSST2021Strategy(logger)
+  def mkStrategy: JSSST2021Strategy = new JSSST2021Strategy()(logger)
 }
